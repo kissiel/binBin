@@ -19,6 +19,8 @@ import os
 import subprocess
 import sys
 
+from shutil import which
+
 
 description = """
 Probe a video file to see if it's encoded in a way that the default
@@ -30,6 +32,11 @@ directory pointed by that envvar.
 ALLOWED_ACODECS = ['aac']
 
 def main():
+    for tool in ['ffmpeg', 'ffprobe']:
+        if not which(tool):
+            raise SystemExit(
+                "{} not found in the system!".format(tool))
+
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('input_file')
     args = parser.parse_args()
