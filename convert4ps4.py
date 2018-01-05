@@ -30,6 +30,7 @@ directory pointed by that envvar.
 """.strip()
 
 ALLOWED_ACODECS = ['aac']
+ALLOWED_VCODECS = ['x264']
 
 def main():
     for tool in ['ffmpeg', 'ffprobe']:
@@ -63,8 +64,9 @@ def probe(media_file):
     audio_candidates = []
     for stream in info['streams']:
         if stream['codec_type'] == 'video':
-            video_codec = stream['codec_name']
-            continue
+            if stream['codec_name'] in ALLOWED_VCODECS:
+                video_codec = stream['codec_name']
+                continue
         if stream['codec_type'] == 'audio':
             audio_candidates.append(stream)
     def is_in_english(stream):
