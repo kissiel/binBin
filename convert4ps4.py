@@ -51,7 +51,7 @@ def main():
         raise SystemExit(
             "{} doesn't look like a good target directory!".format(target_dir))
 
-    print(probe(args.input_file))
+    probe(args.input_file)
 
 
 def probe(media_file):
@@ -64,10 +64,14 @@ def probe(media_file):
     audio_candidates = []
     for stream in info['streams']:
         if stream['codec_type'] == 'video':
+            print('Found video stream: #{}, codec: {}'.format(
+                stream['index'], stream['codec_name']))
             if stream['codec_name'] in ALLOWED_VCODECS:
                 video_codec = stream['codec_name']
                 continue
         if stream['codec_type'] == 'audio':
+            print('Found audio stream: #{}, codec: {}'.format(
+                stream['index'], stream['codec_name']))
             audio_candidates.append(stream)
     def is_in_english(stream):
         return stream['tags'].get('language', '') in ['eng', 'english']
