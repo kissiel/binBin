@@ -19,6 +19,7 @@ import os
 import subprocess
 import sys
 
+from collections import namedtuple
 from shutil import which
 
 
@@ -30,7 +31,7 @@ directory pointed by that envvar.
 """.strip()
 
 ALLOWED_ACODECS = ['aac']
-ALLOWED_VCODECS = ['x264']
+ALLOWED_VCODECS = ['h264']
 
 def main():
     for tool in ['ffmpeg', 'ffprobe']:
@@ -51,23 +52,27 @@ def main():
         raise SystemExit(
             "{} doesn't look like a good target directory!".format(target_dir))
 
-    probe(args.input_file)
+    print(strategize(args.input_file))
 
 
-def probe(media_file):
-    """Identify container, video, and audio codec of a file."""
+
+def strategize(media_file):
+    """Pick the streams to use and determine if they require transcoding."""
     cmd = ['ffprobe', '-print_format', 'json', '-v', 'quiet', '-show_format',
            '-show_streams', media_file] 
     output = subprocess.check_output(cmd).decode(sys.stdout.encoding)
     info = json.loads(output)
     container = info['format']['format_name']
     audio_candidates = []
+    video_stream = -1
+    video_conversion = None
     for stream in info['streams']:
         if stream['codec_type'] == 'video':
             print('Found video stream: #{}, codec: {}'.format(
                 stream['index'], stream['codec_name']))
             if stream['codec_name'] in ALLOWED_VCODECS:
-                video_codec = stream['codec_name']
+                video_stream = stream['index']
+                video_conversion = False
                 continue
         if stream['codec_type'] == 'audio':
             print('Found audio stream: #{}, codec: {}'.format(
@@ -78,13 +83,32 @@ def probe(media_file):
     english_streams = [ac for ac in audio_candidates if is_in_english(ac)]
     if english_streams:
         audio_candidates = english_streams
-    for stream in audio_candidates:
-        if stream['codec_name'] in ALLOWED_ACODECS:
-            # good codec - no transcoding needed
-            pass
+    # is there a stereo track?
+    stereo_streams = [s for s in audio_candidates if
+        s['channel_layout'] == 'stereo']
+    if stereo_streams:
+        audio_candidates = stereo_streams
+    if not audio_candidates:
+        print("No suitable audio stream found\n\n")
+        from pprint import pprint
+        pprint(info['format'])
+        raise SystemExit(1)
+    good_encoding_streams = [s for s in audio_candidates if
+        s['codec_name'] in ALLOWED_ACODECS]
+    if good_encoding_streams:
+        audio_stream = good_encoding_streams[0]['index']
+        audio_conversion = False # doesn't need conversion
+    else:
+        audio_stream = audio_candidates[0]['index']
+        audio_conversion = True
+
+    return (
+        (video_stream, video_conversion),
+        (audio_stream, audio_conversion),
+    )
 
 
-    return audio_candidates
+
 
     
 
