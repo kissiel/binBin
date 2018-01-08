@@ -41,6 +41,7 @@ def main():
 
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('input_file')
+    parser.add_argument('--dry-run', action='store_true')
     args = parser.parse_args()
 
     if not os.path.isfile(args.input_file):
@@ -51,15 +52,43 @@ def main():
     if not os.path.isdir(target_dir):
         raise SystemExit(
             "{} doesn't look like a good target directory!".format(target_dir))
+    base, ext = os.path.splitext(args.input_file)
+    target_dir = os.environ.get('C4PS4_TARGET', '')
+    output_path = os.path.join(
+        target_dir, os.path.basename(base) + '_converted_' + ext)
 
-    print(strategize(args.input_file))
 
+    v, a = strategize(args.input_file)
+    if v[1]:  # have to transcode video
+        v_codec = 'libx264'
+        v_opts = []
+    else:
+        v_codec = 'copy'
+        v_opts = []
+    if a[1]:
+        a_codec = 'aac'
+        a_opts = ['-ac', '2', '-ab', '192k']
+    else:
+        a_codec = 'copy'
+        a_opts = []
+
+    stream_map = ['-map', '0:{}'.format(v[0]), '-map', '0:{}'.format(a[0])]
+
+    # generate ffmpeg invocation
+    cmd = ['ffmpeg', '-i', args.input_file]
+    cmd += stream_map
+    cmd += ['-vcodec', v_codec] + v_opts + ['-acodec', a_codec] + a_opts
+    cmd += [output_path]
+    if args.dry_run:
+        print(" ".join(cmd))
+    else:
+        subprocess.run(cmd)
 
 
 def strategize(media_file):
     """Pick the streams to use and determine if they require transcoding."""
     cmd = ['ffprobe', '-print_format', 'json', '-v', 'quiet', '-show_format',
-           '-show_streams', media_file] 
+           '-show_streams', media_file]
     output = subprocess.check_output(cmd).decode(sys.stdout.encoding)
     info = json.loads(output)
     container = info['format']['format_name']
@@ -68,15 +97,15 @@ def strategize(media_file):
     video_conversion = None
     for stream in info['streams']:
         if stream['codec_type'] == 'video':
-            print('Found video stream: #{}, codec: {}'.format(
-                stream['index'], stream['codec_name']))
+            # print('Found video stream: #{}, codec: {}'.format(
+                # stream['index'], stream['codec_name']))
             if stream['codec_name'] in ALLOWED_VCODECS:
                 video_stream = stream['index']
                 video_conversion = False
                 continue
         if stream['codec_type'] == 'audio':
-            print('Found audio stream: #{}, codec: {}'.format(
-                stream['index'], stream['codec_name']))
+            # print('Found audio stream: #{}, codec: {}'.format(
+                # stream['index'], stream['codec_name']))
             audio_candidates.append(stream)
     def is_in_english(stream):
         return stream['tags'].get('language', '') in ['eng', 'english']
@@ -106,11 +135,6 @@ def strategize(media_file):
         (video_stream, video_conversion),
         (audio_stream, audio_conversion),
     )
-
-
-
-
-    
 
 if __name__ == '__main__':
     main()
