@@ -19,7 +19,6 @@ import os
 import subprocess
 import sys
 
-from collections import namedtuple
 from shutil import which
 
 
@@ -32,6 +31,7 @@ directory pointed by that envvar.
 
 ALLOWED_ACODECS = ['aac']
 ALLOWED_VCODECS = ['h264']
+
 
 def main():
     for tool in ['ffmpeg', 'ffprobe']:
@@ -56,7 +56,6 @@ def main():
     target_dir = os.environ.get('C4PS4_TARGET', '')
     output_path = os.path.join(
         target_dir, os.path.basename(base) + '_converted_' + ext)
-
 
     v, a = strategize(args.input_file)
     if v[1]:  # have to transcode video
@@ -91,7 +90,6 @@ def strategize(media_file):
            '-show_streams', media_file]
     output = subprocess.check_output(cmd).decode(sys.stdout.encoding)
     info = json.loads(output)
-    container = info['format']['format_name']
     audio_candidates = []
     video_stream = -1
     video_conversion = None
@@ -107,6 +105,7 @@ def strategize(media_file):
             # print('Found audio stream: #{}, codec: {}'.format(
                 # stream['index'], stream['codec_name']))
             audio_candidates.append(stream)
+
     def is_in_english(stream):
         return stream['tags'].get('language', '') in ['eng', 'english']
     english_streams = [ac for ac in audio_candidates if is_in_english(ac)]
@@ -114,7 +113,7 @@ def strategize(media_file):
         audio_candidates = english_streams
     # is there a stereo track?
     stereo_streams = [s for s in audio_candidates if
-        s['channel_layout'] == 'stereo']
+                      s['channel_layout'] == 'stereo']
     if stereo_streams:
         audio_candidates = stereo_streams
     if not audio_candidates:
@@ -123,10 +122,10 @@ def strategize(media_file):
         pprint(info['format'])
         raise SystemExit(1)
     good_encoding_streams = [s for s in audio_candidates if
-        s['codec_name'] in ALLOWED_ACODECS]
+                             s['codec_name'] in ALLOWED_ACODECS]
     if good_encoding_streams:
         audio_stream = good_encoding_streams[0]['index']
-        audio_conversion = False # doesn't need conversion
+        audio_conversion = False  # doesn't need conversion
     else:
         audio_stream = audio_candidates[0]['index']
         audio_conversion = True
@@ -136,7 +135,6 @@ def strategize(media_file):
         (audio_stream, audio_conversion),
     )
 
+
 if __name__ == '__main__':
     main()
-
-
