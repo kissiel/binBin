@@ -1,0 +1,1 @@
+watch -n 0.1 'echo `cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq |sort -n |tail -n 1` / 1000 | bc'
